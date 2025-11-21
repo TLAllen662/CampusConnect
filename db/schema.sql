@@ -34,4 +34,35 @@ CREATE TABLE external_events (
     description TEXT,                     -- Event description
     source_url TEXT,                      -- URL where event was scraped from
     scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP  -- Timestamp when event was added
+);
+
+-- Drop existing api_data table if it exists
+DROP TABLE IF EXISTS api_data;
+
+-- Create api_data table for WeatherStack API weather data
+CREATE TABLE api_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,     -- Auto-incrementing unique ID
+    location_name TEXT NOT NULL,              -- Location name (e.g., "New York")
+    country TEXT,                             -- Country name
+    region TEXT,                              -- Region/state name
+    lat TEXT,                                 -- Latitude coordinate
+    lon TEXT,                                 -- Longitude coordinate
+    timezone_id TEXT,                         -- Timezone ID (e.g., "America/New_York")
+    localtime TEXT,                           -- Local time at location
+    temperature INTEGER,                      -- Current temperature (Celsius by default)
+    weather_code INTEGER,                     -- Weather condition code
+    weather_icons TEXT,                       -- Weather icon URLs (stored as JSON array)
+    weather_descriptions TEXT,                -- Weather description (e.g., "Sunny", "Cloudy")
+    wind_speed INTEGER,                       -- Wind speed (km/h by default)
+    wind_degree INTEGER,                      -- Wind direction in degrees
+    wind_dir TEXT,                            -- Wind direction (e.g., "N", "NE", "SW")
+    pressure INTEGER,                         -- Air pressure (MB - millibar)
+    precip REAL,                              -- Precipitation level (MM - millimeters)
+    humidity INTEGER,                         -- Humidity percentage
+    cloudcover INTEGER,                       -- Cloud cover percentage
+    feelslike INTEGER,                        -- "Feels like" temperature
+    uv_index INTEGER,                         -- UV index
+    visibility INTEGER,                       -- Visibility (kilometers)
+    observation_time TEXT,                    -- UTC time when data was collected
+    fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP  -- Timestamp when data was added to DB
 )
