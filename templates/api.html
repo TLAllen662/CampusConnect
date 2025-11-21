@@ -2,19 +2,61 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard - CampusConnect</title>
+    <title>Weather Data - CampusConnect</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <header>
-        <h1>Student Dashboard</h1>
+        <h1>Weather Dashboard</h1>
     </header>
     <main>
-        <p>Welcome back! Here’s what’s happening:</p>
-        <ul>
-            <li>More features coming soon...</li>
-            <li><a href="/events">View Events</a></li>
-        </ul>
+        <h2>Current Weather Data</h2>
+        <p>Live weather information from WeatherStack API</p>
+        
+        {% if api_data %}
+        <table border="1" cellpadding="10" cellspacing="0">
+            <thead>
+                <tr>
+                    <!-- Column headers matching SQL query columns -->
+                    <th>Location</th>
+                    <th>Country</th>
+                    <th>Temperature (°C)</th>
+                    <th>Weather</th>
+                    <th>Humidity (%)</th>
+                    <th>Wind Speed (km/h)</th>
+                    <th>Wind Direction</th>
+                    <th>Pressure (MB)</th>
+                    <th>Feels Like (°C)</th>
+                    <th>UV Index</th>
+                    <th>Visibility (km)</th>
+                    <th>Local Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in api_data %}
+                <tr>
+                    <td>{{ row[0] }}</td>  <!-- location_name -->
+                    <td>{{ row[1] }}</td>  <!-- country -->
+                    <td>{{ row[2] }}</td>  <!-- temperature -->
+                    <td>{{ row[3] }}</td>  <!-- weather_descriptions -->
+                    <td>{{ row[4] }}</td>  <!-- humidity -->
+                    <td>{{ row[5] }}</td>  <!-- wind_speed -->
+                    <td>{{ row[6] }}</td>  <!-- wind_dir -->
+                    <td>{{ row[7] }}</td>  <!-- pressure -->
+                    <td>{{ row[8] }}</td>  <!-- feelslike -->
+                    <td>{{ row[9] }}</td>  <!-- uv_index -->
+                    <td>{{ row[10] }}</td> <!-- visibility -->
+                    <td>{{ row[11] }}</td> <!-- localtime -->
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No weather data available. Please check your API key configuration.</p>
+        {% endif %}
+        
+        <br>
+        <p><a href="/">Back to Home</a> | <a href="/events">View Events</a></p>
     </main>
 </body>
 </html>
