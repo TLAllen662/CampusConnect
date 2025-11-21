@@ -24,7 +24,6 @@ class CampusEventScraper:
         self.base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
     
     def scrape_events(self, url=None):
-    def scrape_events(self, url=None):
         """
         Scrape events from the campus events calendar page
         

@@ -19,9 +19,11 @@
         <!-- Added in for your scraped data -->
         <h2>Scraped Campus Events</h2>
         <ul>
-            {% for title, location, date, description in external_events %}
-                <li><strong>{{ title }}</strong> — {{ date }} @ {{ location }}<br>
-                <em>{{ description }}</em></li>
+            <!-- Fixed unpacking error with AI assistance - adjusted template to match 5 SQL columns -->
+            <!-- (title, location, date, time, description) instead of 4 -->
+            {% for title, location, date, time, description in external_events %}
+                <li><strong>{{ title }}</strong> — {{ date }} {% if time %}{{ time }}{% endif %} @ {{ location }}<br>
+                {% if description %}<em>{{ description }}</em>{% endif %}</li>
             {% endfor %}
         </ul>
         <!-- End of additions -->
