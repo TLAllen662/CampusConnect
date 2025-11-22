@@ -54,52 +54,22 @@ class CampusEventScraper:
             # Use a set to track events we've already processed (avoid duplicates)
             seen_events = set()
             
-            # Loop through each event link found
-            for link in event_links:
+            # Loop through each event link found - increased limit to get more variety
+            for link in event_links[:10]:  # Process up to 10 unique events
                 event_url = link.get('href')  # Get the event URL
                 
                 # Only process if URL exists and we haven't seen it before
                 if event_url and event_url not in seen_events:
                     seen_events.add(event_url)  # Mark this event as seen
                     
-                    # Get event title from link text
-                    event_text = link.get_text(strip=True)
-                    
-                    # Step 4: Perform regex to clean the extracted data
-                    # Try to extract time and title using regex pattern
-                    # Pattern looks for time format like "09:00 AM" followed by title
-                    time_match = re.match(r'(\d{2}:\d{2}\s*[AP]M)\s*(.*)', event_text)
-                    if time_match:
-                        time = time_match.group(1)  # Extract time
-                        # Clean title by removing extra whitespace
-                        title = re.sub(r'\s+', ' ', time_match.group(2).strip()) or 'Campus Event'
-                    else:
-                        # If no time pattern found, use full text as title
-                        time = None
-                        # Clean title by removing extra whitespace and special characters
-                        title = re.sub(r'\s+', ' ', event_text).strip() or 'Campus Event'
-                    
                     # Build full URL (add base URL if relative path)
                     full_url = self.base_url + event_url if event_url.startswith('/') else event_url
                     
-                    # Try to extract date from link or parent elements
-                    date = self._extract_date(link)
+                    # Fetch detailed event information from individual event page
+                    event_details = self._fetch_event_details(full_url)
                     
-                    # Try to extract location from nearby elements
-                    location = self._extract_location(link)
-                    
-                    # Try to extract description from nearby elements
-                    description = self._extract_description(link)
-                    
-                    # Step 5: Store cleaned event data
-                    events.append({
-                        'title': title,
-                        'time': time,
-                        'location': location,
-                        'date': date,
-                        'description': description,
-                        'source_url': full_url
-                    })
+                    if event_details:
+                        events.append(event_details)
             
             return events  # Return list of all scraped events
             
@@ -108,66 +78,95 @@ class CampusEventScraper:
             print(f"Error scraping events: {e}")
             return []
     
-    def _extract_date(self, element):
+    def _fetch_event_details(self, event_url):
         """
-        Helper method to extract date from event element or nearby elements
-        Uses regex to find common date patterns
-        """
-        try:
-            # Look in parent elements for date information
-            parent = element.find_parent()
-            if parent:
-                text = parent.get_text()
-                # Try to match common date patterns (MM/DD/YYYY, Month DD, YYYY, etc.)
-                date_patterns = [
-                    r'(\d{1,2}/\d{1,2}/\d{4})',  # MM/DD/YYYY
-                    r'(\d{1,2}-\d{1,2}-\d{4})',  # MM-DD-YYYY
-                    r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})',  # Month DD, YYYY
-                ]
-                for pattern in date_patterns:
-                    match = re.search(pattern, text, re.IGNORECASE)
-                    if match:
-                        return match.group(1)
-        except:
-            pass
-        return None
-    
-    def _extract_location(self, element):
-        """
-        Helper method to extract location from event element or nearby elements
+        Fetch detailed information from an individual event page
+        
+        Args:
+            event_url: Full URL to the event detail page
+            
+        Returns:
+            Dictionary with event details or None if failed
         """
         try:
-            # Look for location in nearby elements or parent
-            parent = element.find_parent()
-            if parent:
-                # Look for common location indicators
-                location_element = parent.find(string=re.compile(r'location|where|venue', re.IGNORECASE))
-                if location_element:
-                    # Get the next sibling or parent text
-                    location_text = location_element.find_next()
-                    if location_text:
-                        return re.sub(r'\s+', ' ', location_text.get_text().strip())
-        except:
-            pass
-        # Default location if none found
-        return 'Campus Location'
-    
-    def _extract_description(self, element):
-        """
-        Helper method to extract description from event element or nearby elements
-        """
-        try:
-            # Look for description in nearby elements
-            parent = element.find_parent()
-            if parent:
-                # Look for paragraph or description elements
-                desc_element = parent.find(['p', 'div'], class_=re.compile(r'desc|detail|summary', re.IGNORECASE))
-                if desc_element:
-                    # Clean description by removing extra whitespace
-                    return re.sub(r'\s+', ' ', desc_element.get_text().strip())[:500]  # Limit to 500 chars
-        except:
-            pass
-        return None
+            # Request the individual event page
+            print(f"  Fetching details from: {event_url}")
+            response = requests.get(event_url, timeout=10)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Extract event title - usually in h2 with class or first h2
+            title = 'Campus Event'
+            title_elem = soup.find('h2', class_=re.compile(r'event|title', re.IGNORECASE))
+            if not title_elem:
+                title_elem = soup.find('h2')
+            if title_elem:
+                title = title_elem.get_text(strip=True)
+                title = re.sub(r'\s+', ' ', title).strip()
+            
+            # Extract description - look for paragraphs after DESCRIPTION heading
+            description = None
+            # Find all text nodes and look for description content
+            text_content = soup.get_text()
+            desc_match = re.search(r'DESCRIPTION\s+(.*?)(?:QUESTIONS|Upcoming|Interested|$)', text_content, re.DOTALL | re.IGNORECASE)
+            if desc_match:
+                description = desc_match.group(1).strip()
+                # Clean up the description
+                description = re.sub(r'\s+', ' ', description).strip()
+                # Remove any script/style content
+                description = re.sub(r'<[^>]+>', '', description)
+                # Limit length
+                description = description[:500] if len(description) > 500 else description
+            
+            # Extract location - look for address or building name
+            location = 'Blue Mountain Christian University'
+            # Try to find location in structured way
+            location_match = re.search(r'LOCATION\s+([^\n]+)', text_content, re.IGNORECASE)
+            if location_match:
+                loc_text = location_match.group(1).strip()
+                # Clean location text - take first meaningful line that looks like a building name
+                loc_lines = [l.strip() for l in loc_text.split() if l.strip()]
+                # Look for building/location name (usually 2-4 words before address)
+                building_match = re.search(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s+\d', text_content)
+                if building_match:
+                    location = building_match.group(1).strip()
+                elif loc_lines:
+                    # Take first few words as location
+                    location = ' '.join(loc_lines[:3])
+                    # Remove any numbers or extra text
+                    location = re.sub(r'\d+.*$', '', location).strip()
+                    if not location:
+                        location = 'Blue Mountain Christian University'
+            
+            # Extract dates - look for month/day/year patterns
+            date = None
+            time = None
+            # Look for date patterns like "Dec 01, 2025"
+            date_match = re.search(r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})', text_content, re.IGNORECASE)
+            if date_match:
+                date = date_match.group(1).strip()
+            
+            # Look for time patterns like "9:00 AM"
+            time_match = re.search(r'(\d{1,2}:\d{2}\s*[AP]M)', text_content)
+            if time_match:
+                time = time_match.group(1).strip()
+            
+            # Build event data dictionary
+            event_data = {
+                'title': title,
+                'time': time,
+                'location': location,
+                'date': date,
+                'description': description,
+                'source_url': event_url
+            }
+            
+            print(f"  ✓ Scraped: {title} - {date} {time} @ {location}")
+            return event_data
+            
+        except Exception as e:
+            print(f"  ✗ Error fetching event details: {e}")
+            return None
     
     def save_events_to_db(self, events):
         """
