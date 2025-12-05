@@ -8,22 +8,33 @@ import re  # For regular expression pattern matching
 class CampusEventScraper:
     """
     A web scraper for extracting campus events from external event calendar websites.
-    
+
     This class fetches event information from a campus events calendar page, parses
     the HTML content, and stores the extracted event data in a SQLite database. It
     handles both the main calendar page and individual event detail pages to extract
     comprehensive event information.
-    
+
     Attributes:
         events_url (str): The main URL of the campus events calendar to scrape
         db_path (str): Path to the SQLite database file for storing events
         base_url (str): Base URL extracted from events_url (scheme + netloc)
-    
+
     Methods:
         scrape_events(url): Scrapes events from the calendar page and returns cleaned data
         _fetch_event_details(event_url): Fetches detailed information from individual event pages
         save_events_to_db(events): Stores scraped events into the external_events database table
         run(): Main orchestration method that scrapes and saves events
+
+    Notes:
+        - The scraper uses BeautifulSoup and basic regex patterns; it may not
+          capture content that is rendered only via JavaScript. For JavaScript-
+          heavy sites consider using a headless browser (e.g., Selenium).
+        - The `save_events_to_db` method uses parameterized SQL to avoid injection.
+
+    Examples:
+        >>> scraper = CampusEventScraper('https://events.bmc.edu/calendar')
+        >>> events = scraper.scrape_events()
+        >>> scraper.save_events_to_db(events)
     """
     
     def __init__(self, events_url, db_path='db/campus_connect.db'):
@@ -45,16 +56,16 @@ class CampusEventScraper:
     def scrape_events(self, url=None):
         """
         Scrape events from the campus events calendar page.
-        
+
         Fetches the HTML content from the campus events calendar, parses it using
         BeautifulSoup, extracts event links, and fetches detailed information from
         each individual event page. Uses regex patterns to clean and extract event data
         and deduplicates events to avoid storing duplicate records.
-        
+
         Args:
-            url (str, optional): URL to scrape. Defaults to the URL provided in the 
-                                constructor if not specified.
-        
+            url (str, optional): URL to scrape. Defaults to the URL provided in the
+                constructor if not specified.
+
         Returns:
             list: List of event dictionaries. Each dictionary contains:
                 - 'title' (str): Event name
@@ -63,6 +74,15 @@ class CampusEventScraper:
                 - 'time' (str): Event time (e.g., "09:00 AM")
                 - 'description' (str): Event description text
                 - 'source_url' (str): URL where event was found
+
+        Notes:
+            - The method attempts to parse up to 10 unique events by default.
+            - The returned date/time fields may be None if the source page
+              renders those values with JavaScript.
+
+        Example:
+            >>> scraper = CampusEventScraper('https://events.bmc.edu/calendar')
+            >>> events = scraper.scrape_events()
         """
         # Use provided URL or default to the one passed in constructor
         if url is None:
