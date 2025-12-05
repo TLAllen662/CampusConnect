@@ -5,8 +5,27 @@ import sqlite3  # For database operations
 from datetime import datetime  # For handling dates and times
 import re  # For regular expression pattern matching
 
-# Main class for scraping campus events from external websites
-class CampusEventScraper:    
+class CampusEventScraper:
+    """
+    A web scraper for extracting campus events from external event calendar websites.
+    
+    This class fetches event information from a campus events calendar page, parses
+    the HTML content, and stores the extracted event data in a SQLite database. It
+    handles both the main calendar page and individual event detail pages to extract
+    comprehensive event information.
+    
+    Attributes:
+        events_url (str): The main URL of the campus events calendar to scrape
+        db_path (str): Path to the SQLite database file for storing events
+        base_url (str): Base URL extracted from events_url (scheme + netloc)
+    
+    Methods:
+        scrape_events(url): Scrapes events from the calendar page and returns cleaned data
+        _fetch_event_details(event_url): Fetches detailed information from individual event pages
+        save_events_to_db(events): Stores scraped events into the external_events database table
+        run(): Main orchestration method that scrapes and saves events
+    """
+    
     def __init__(self, events_url, db_path='db/campus_connect.db'):
         """
         Initialize the scraper with campus events URL and database path
@@ -25,13 +44,25 @@ class CampusEventScraper:
     
     def scrape_events(self, url=None):
         """
-        Scrape events from the campus events calendar page
+        Scrape events from the campus events calendar page.
+        
+        Fetches the HTML content from the campus events calendar, parses it using
+        BeautifulSoup, extracts event links, and fetches detailed information from
+        each individual event page. Uses regex patterns to clean and extract event data
+        and deduplicates events to avoid storing duplicate records.
         
         Args:
-            url: Optional URL to scrape (defaults to the URL provided in constructor)
+            url (str, optional): URL to scrape. Defaults to the URL provided in the 
+                                constructor if not specified.
         
         Returns:
-            List of event dictionaries with cleaned data
+            list: List of event dictionaries. Each dictionary contains:
+                - 'title' (str): Event name
+                - 'location' (str): Building/venue name
+                - 'date' (str): Event date (e.g., "Dec 01, 2025")
+                - 'time' (str): Event time (e.g., "09:00 AM")
+                - 'description' (str): Event description text
+                - 'source_url' (str): URL where event was found
         """
         # Use provided URL or default to the one passed in constructor
         if url is None:
@@ -80,13 +111,27 @@ class CampusEventScraper:
     
     def _fetch_event_details(self, event_url):
         """
-        Fetch detailed information from an individual event page
+        Fetch detailed information from an individual event page.
+        
+        Retrieves the HTML content of a single event's detail page and uses regex
+        pattern matching to extract structured information including title, location,
+        date, time, and description. Cleans and normalizes all extracted data.
+        
+        This is a private method (indicated by leading underscore) used internally
+        by scrape_events() to get details for each event found on the calendar.
         
         Args:
-            event_url: Full URL to the event detail page
+            event_url (str): Full URL to the event detail page
             
         Returns:
-            Dictionary with event details or None if failed
+            dict or None: Dictionary containing extracted event details if successful:
+                - 'title' (str): Event name
+                - 'location' (str): Building or venue name  
+                - 'date' (str): Event date in format like "Dec 01, 2025"
+                - 'time' (str): Event time in format like "09:00 AM"
+                - 'description' (str): Event description (up to 500 characters)
+                - 'source_url' (str): The event URL
+            Returns None if an error occurs during fetching or parsing.
         """
         try:
             # Request the individual event page
@@ -170,13 +215,19 @@ class CampusEventScraper:
     
     def save_events_to_db(self, events):
         """
-        Step 6: Store the cleaned event data into external_events table
+        Store the cleaned event data into the external_events database table.
+        
+        Takes a list of event dictionaries and inserts them into the SQLite database's
+        external_events table. Uses parameterized queries (?) to safely prevent SQL
+        injection attacks. Commits all inserts atomically.
         
         Args:
-            events: List of event dictionaries to save
+            events (list): List of event dictionaries to save. Each dictionary should 
+                          contain keys: 'title', 'location', 'date', 'time', 
+                          'description', 'source_url'
             
         Returns:
-            True if successful, False otherwise
+            bool: True if all events were successfully saved, False if an error occurred
         """
         try:
             # Connect to the SQLite database
@@ -214,7 +265,13 @@ class CampusEventScraper:
             return False
     
     def run(self):
-        """Main method to scrape and save events"""
+        """
+        Main orchestration method that performs complete scraping workflow.
+        
+        Executes the full event scraping pipeline: fetches events from the calendar,
+        parses them, extracts details, and stores the results in the database. This
+        is the primary method to call for normal usage.
+        """
         print(f"Scraping events from campus calendar: {self.events_url}")
         
         # Scrape events from the campus website

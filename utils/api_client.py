@@ -7,7 +7,23 @@ from datetime import datetime  # For timestamp handling
 
 class APIClient:
     """
-    WeatherStack API Client for fetching and storing weather data
+    A client for the WeatherStack API that fetches, cleans, and stores weather data.
+    
+    This class manages interactions with the WeatherStack weather API. It handles
+    HTTP requests to fetch current weather data for specified locations, performs
+    data cleaning and normalization using regex patterns, and stores the results
+    in a SQLite database for persistence and analysis.
+    
+    Attributes:
+        api_key (str): WeatherStack API access key for authentication
+        base_url (str): The API endpoint URL for current weather data (http://api.weatherstack.com/current)
+        db_path (str): Path to the SQLite database file for storing weather data
+    
+    Methods:
+        fetch_weather(location): Sends GET request to WeatherStack API and returns raw JSON data
+        clean_data(weather_data): Performs regex cleaning and normalization on weather data
+        save_to_database(cleaned_data): Inserts cleaned weather data into the api_data database table
+        get_and_store_weather(location): Orchestration method combining fetch, clean, and store operations
     """
     
     def __init__(self, api_key, db_path='db/campus_connect.db'):
@@ -24,13 +40,22 @@ class APIClient:
     
     def fetch_weather(self, location):
         """
-        Step 1: Send GET request to WeatherStack API
+        Send GET request to WeatherStack API and retrieve current weather data.
+        
+        Constructs an HTTP GET request with the provided location and API credentials,
+        sends it to the WeatherStack current weather endpoint, and returns the parsed
+        JSON response. Handles network errors and API error responses gracefully.
         
         Args:
-            location: Location name (e.g., "New York", "London")
+            location (str): Location name for weather data (e.g., "New York", "London", 
+                           "San Francisco"). The API performs geocoding to find the 
+                           closest matching location.
             
         Returns:
-            Dictionary with weather data or None if request fails
+            dict or None: Parsed JSON response from the API containing:
+                - 'location' (dict): Location information (name, country, region, coordinates)
+                - 'current' (dict): Current weather data (temperature, conditions, wind, etc.)
+            Returns None if the request fails or the API returns an error.
         """
         try:
             # Build API request URL with parameters
@@ -62,13 +87,33 @@ class APIClient:
     
     def clean_data(self, weather_data):
         """
-        Step 3: Perform regex to clean the returned data
+        Perform regex-based cleaning and normalization of weather data.
+        
+        Processes the raw JSON weather data from the API by:
+        - Removing excess whitespace from text fields
+        - Converting weather icon arrays to JSON strings
+        - Normalizing wind direction to uppercase
+        - Extracting and formatting weather descriptions
+        - Ensuring consistent data types and formats
+        
+        All string fields are trimmed and normalized using regex patterns to ensure
+        data quality and consistency when storing in the database.
         
         Args:
-            weather_data: Raw JSON data from API
+            weather_data (dict): Raw JSON response from WeatherStack API containing
+                                'location' and 'current' keys with nested data
             
         Returns:
-            Dictionary with cleaned data ready for database insertion
+            dict or None: Cleaned data dictionary with 22 fields ready for database insertion:
+                - 'location_name', 'country', 'region': Location info
+                - 'lat', 'lon', 'timezone_id', 'localtime': Coordinates and timezone
+                - 'temperature', 'feelslike': Temperature values
+                - 'weather_code', 'weather_descriptions', 'weather_icons': Condition data
+                - 'wind_speed', 'wind_degree', 'wind_dir': Wind information
+                - 'pressure', 'precip', 'humidity', 'cloudcover': Other metrics
+                - 'uv_index', 'visibility': Additional data
+                - 'observation_time': Timestamp of data
+            Returns None if an error occurs during cleaning.
         """
         try:
             # Extract location information
@@ -140,14 +185,22 @@ class APIClient:
     
     def save_to_database(self, cleaned_data):
         """
-        Step 4 & 5: Insert the cleaned data into api_data table in database
-        (Table was already created in schema.sql)
+        Insert cleaned weather data into the api_data table in SQLite database.
+        
+        Establishes a connection to the SQLite database and inserts the 22 cleaned
+        weather data fields into the api_data table. Uses parameterized queries (?)
+        to safely prevent SQL injection attacks. Commits the transaction after insertion.
         
         Args:
-            cleaned_data: Dictionary with cleaned weather data
+            cleaned_data (dict): Dictionary containing cleaned weather data with keys:
+                'location_name', 'country', 'region', 'lat', 'lon', 'timezone_id',
+                'localtime', 'temperature', 'weather_code', 'weather_icons',
+                'weather_descriptions', 'wind_speed', 'wind_degree', 'wind_dir',
+                'pressure', 'precip', 'humidity', 'cloudcover', 'feelslike',
+                'uv_index', 'visibility', 'observation_time'
             
         Returns:
-            True if successful, False otherwise
+            bool: True if data was successfully inserted, False if an error occurred
         """
         try:
             # Connect to SQLite database
@@ -203,14 +256,23 @@ class APIClient:
     
     def get_and_store_weather(self, location):
         """
-        Main method to fetch weather data and store it in database
-        Combines all steps: fetch, parse, clean, and store
+        Main orchestration method to fetch, clean, and store weather data.
+        
+        Executes the complete weather data pipeline in sequence:
+        1. Fetches raw weather data from WeatherStack API for the specified location
+        2. Cleans and normalizes the data using regex patterns
+        3. Stores the cleaned data in the SQLite database
+        
+        This is the primary method to call for normal usage. It combines all other
+        methods into a single workflow and handles error reporting at each step.
         
         Args:
-            location: Location name to get weather for
+            location (str): Location name to retrieve weather for (e.g., "New York", 
+                           "London"). The API will geocode this to find the location.
             
         Returns:
-            True if successful, False otherwise
+            bool: True if weather data was successfully fetched, cleaned, and stored;
+                 False if any step in the pipeline fails
         """
         # Step 1 & 2: Fetch and parse weather data
         weather_data = self.fetch_weather(location)
