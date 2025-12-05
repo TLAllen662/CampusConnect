@@ -132,17 +132,17 @@ class CampusEventScraper:
     def _fetch_event_details(self, event_url):
         """
         Fetch detailed information from an individual event page.
-        
+
         Retrieves the HTML content of a single event's detail page and uses regex
         pattern matching to extract structured information including title, location,
         date, time, and description. Cleans and normalizes all extracted data.
-        
+
         This is a private method (indicated by leading underscore) used internally
         by scrape_events() to get details for each event found on the calendar.
-        
+
         Args:
             event_url (str): Full URL to the event detail page
-            
+
         Returns:
             dict or None: Dictionary containing extracted event details if successful:
                 - 'title' (str): Event name
@@ -152,6 +152,14 @@ class CampusEventScraper:
                 - 'description' (str): Event description (up to 500 characters)
                 - 'source_url' (str): The event URL
             Returns None if an error occurs during fetching or parsing.
+
+        Notes:
+            - For sites with structured meta tags (schema.org), this method may be
+              extended to prefer those fields for more reliable parsing.
+            - Keep network timeouts low (10 seconds) to avoid long waits on slow sites.
+
+        Example:
+            >>> details = scraper._fetch_event_details('https://events.bmc.edu/event/123')
         """
         try:
             # Request the individual event page
@@ -236,18 +244,24 @@ class CampusEventScraper:
     def save_events_to_db(self, events):
         """
         Store the cleaned event data into the external_events database table.
-        
-        Takes a list of event dictionaries and inserts them into the SQLite database's
+
+        Takes a list of event dictionaries and inserts them into the SQLite database
         external_events table. Uses parameterized queries (?) to safely prevent SQL
         injection attacks. Commits all inserts atomically.
-        
+
         Args:
-            events (list): List of event dictionaries to save. Each dictionary should 
-                          contain keys: 'title', 'location', 'date', 'time', 
-                          'description', 'source_url'
-            
+            events (list): List of event dictionaries to save. Each dictionary should
+                contain keys: 'title', 'location', 'date', 'time', 'description', 'source_url'
+
         Returns:
             bool: True if all events were successfully saved, False if an error occurred
+
+        Notes:
+            - If you plan to insert many events at once consider batching inserts or
+              using `executemany` for better performance.
+
+        Example:
+            >>> success = scraper.save_events_to_db(events)
         """
         try:
             # Connect to the SQLite database

@@ -41,21 +41,28 @@ class APIClient:
     def fetch_weather(self, location):
         """
         Send GET request to WeatherStack API and retrieve current weather data.
-        
+
         Constructs an HTTP GET request with the provided location and API credentials,
         sends it to the WeatherStack current weather endpoint, and returns the parsed
         JSON response. Handles network errors and API error responses gracefully.
-        
+
         Args:
-            location (str): Location name for weather data (e.g., "New York", "London", 
-                           "San Francisco"). The API performs geocoding to find the 
-                           closest matching location.
-            
+            location (str): Location name for weather data (e.g., "New York", "London",
+                "San Francisco"). The API performs geocoding to find the closest match.
+
         Returns:
             dict or None: Parsed JSON response from the API containing:
                 - 'location' (dict): Location information (name, country, region, coordinates)
                 - 'current' (dict): Current weather data (temperature, conditions, wind, etc.)
             Returns None if the request fails or the API returns an error.
+
+        Notes:
+            - WeatherStack free plan may limit certain fields or request frequency.
+            - Avoid logging API keys or including them in screenshots or public repos.
+
+        Example:
+            >>> client = APIClient(api_key='YOUR_KEY')
+            >>> data = client.fetch_weather('New York')
         """
         try:
             # Build API request URL with parameters
@@ -88,21 +95,21 @@ class APIClient:
     def clean_data(self, weather_data):
         """
         Perform regex-based cleaning and normalization of weather data.
-        
+
         Processes the raw JSON weather data from the API by:
         - Removing excess whitespace from text fields
         - Converting weather icon arrays to JSON strings
         - Normalizing wind direction to uppercase
         - Extracting and formatting weather descriptions
         - Ensuring consistent data types and formats
-        
+
         All string fields are trimmed and normalized using regex patterns to ensure
         data quality and consistency when storing in the database.
-        
+
         Args:
             weather_data (dict): Raw JSON response from WeatherStack API containing
-                                'location' and 'current' keys with nested data
-            
+                'location' and 'current' keys with nested data
+
         Returns:
             dict or None: Cleaned data dictionary with 22 fields ready for database insertion:
                 - 'location_name', 'country', 'region': Location info
@@ -114,6 +121,16 @@ class APIClient:
                 - 'uv_index', 'visibility': Additional data
                 - 'observation_time': Timestamp of data
             Returns None if an error occurs during cleaning.
+
+        Notes:
+            - The cleaned 'weather_icons' field is stored as a JSON string to preserve
+              the original icon URLs while keeping the database column type simple.
+            - If your downstream consumers expect numeric types, validate and cast
+              fields like 'temperature', 'pressure', and 'humidity' accordingly.
+
+        Example:
+            >>> raw = client.fetch_weather('New York')
+            >>> cleaned = client.clean_data(raw)
         """
         try:
             # Extract location information
@@ -186,11 +203,11 @@ class APIClient:
     def save_to_database(self, cleaned_data):
         """
         Insert cleaned weather data into the api_data table in SQLite database.
-        
+
         Establishes a connection to the SQLite database and inserts the 22 cleaned
         weather data fields into the api_data table. Uses parameterized queries (?)
         to safely prevent SQL injection attacks. Commits the transaction after insertion.
-        
+
         Args:
             cleaned_data (dict): Dictionary containing cleaned weather data with keys:
                 'location_name', 'country', 'region', 'lat', 'lon', 'timezone_id',
@@ -198,9 +215,18 @@ class APIClient:
                 'weather_descriptions', 'wind_speed', 'wind_degree', 'wind_dir',
                 'pressure', 'precip', 'humidity', 'cloudcover', 'feelslike',
                 'uv_index', 'visibility', 'observation_time'
-            
+
         Returns:
             bool: True if data was successfully inserted, False if an error occurred
+
+        Notes:
+            - Running frequent inserts may grow the `api_data` table; consider a
+              TTL/cleanup policy or a separate archival table if long-term storage
+              isn't required.
+
+        Example:
+            >>> cleaned = client.clean_data(raw)
+            >>> client.save_to_database(cleaned)
         """
         try:
             # Connect to SQLite database
